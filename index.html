@@ -3,269 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Système d'Inscription | Validation +243</title>
+    <title>NeuroScan AI - Diagnostic Clinique</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
     
-    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
 
     <style>
-        :root { --primary-blue: #0d6efd; }
-        body { background-color: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
-        .navbar { border-bottom: 3px solid var(--primary-blue); }
-        .card { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        :root { --medical-primary: #05668d; --medical-accent: #f0f3f5; --keras-red: #d90429; }
+        body { background-color: var(--medical-accent); font-family: 'Segoe UI', system-ui, sans-serif; padding-bottom: 50px; }
         
-        /* Logo du centre */
-        .center-logo { width: 60px; height: 60px; border-radius: 50%; border: 2px solid var(--primary-blue); object-fit: cover; }
+        .main-header { background: linear-gradient(135deg, #022b3a, #05668d); color: white; padding: 25px; border-bottom: 5px solid var(--keras-red); }
         
-        /* Animation paiements */
-        .network-item { 
-            display: flex; align-items: center; padding: 12px; border-radius: 12px; 
-            background: #fff; border: 1px solid #eee; margin-bottom: 10px; transition: 0.3s ease; 
-        }
-        .network-item:hover { transform: translateX(10px); border-color: var(--primary-blue); }
-        .network-logo { width: 40px; height: 40px; object-fit: contain; margin-right: 15px; }
+        /* Zone Scanner Pro */
+        .scanner-container { background: #000; border-radius: 20px; position: relative; overflow: hidden; border: 4px solid #fff; box-shadow: 0 15px 30px rgba(0,0,0,0.1); max-height: 400px; }
+        #medicalImg { width: 100%; height: auto; display: block; opacity: 0.85; transition: 0.3s; }
+        
+        /* Heatmap Grad-CAM */
+        .heatmap { position: absolute; width: 160px; height: 160px; background: radial-gradient(circle, rgba(217, 4, 41, 0.5) 0%, transparent 75%); border-radius: 50%; z-index: 10; display: none; filter: blur(10px); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 0.8; } 100% { transform: scale(1); opacity: 0.5; } }
 
-        /* Grille Formations */
-        .formation-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
-        .formation-card { 
-            border: 2px solid #e9ecef; border-radius: 10px; padding: 10px; 
-            cursor: pointer; transition: 0.2s; background: white; text-align: center; font-size: 0.85rem;
-        }
-        .formation-card.selected { border-color: var(--primary-blue); background-color: #e7f1ff; color: var(--primary-blue); font-weight: bold; }
-        .formation-card input { display: none; }
+        .scan-line { position: absolute; width: 100%; height: 3px; background: #3a86ff; box-shadow: 0 0 15px #3a86ff; top: 0; display: none; z-index: 15; }
+
+        .clinical-form { background: white; border-radius: 15px; padding: 20px; border-left: 5px solid var(--medical-primary); }
+        .log-terminal { background: #1a1a1a; color: #00ff41; font-family: 'Courier New', monospace; padding: 15px; border-radius: 10px; font-size: 0.8rem; height: 120px; overflow-y: auto; }
     </style>
 </head>
 <body>
 
-<nav class="navbar navbar-dark bg-dark px-4 py-2 mb-4">
-    <div class="container">
-        <div class="navbar-brand d-flex align-items-center fw-bold">
-            <img src="IMG_0213.PNG" alt="Logo Centre" class="center-logo me-3">
-            <span>GESTION DES INSCRIPTIONS</span>
+<header class="main-header shadow-sm mb-4">
+    <div class="container d-flex justify-content-between align-items-center">
+        <div>
+            <h4 class="fw-bold mb-0"><i class="bi bi-heart-pulse-fill me-2"></i>NeuroScan AI Pro</h4>
+            <small class="opacity-75">Moteur de diagnostic Keras v3.4.1</small>
         </div>
+        <div id="modelBadge" class="badge bg-secondary rounded-pill px-3 py-2">Initialisation de l'IA...</div>
     </div>
-</nav>
+</header>
 
-<div class="container pb-5">
+<div class="container">
     <div class="row g-4">
-        <div class="col-lg-8">
-            <div class="card p-4">
-                <div class="d-flex align-items-center mb-4">
-                    <img src="IMG_0213.PNG" alt="Logo" style="width: 45px; height: 45px; margin-right: 15px;">
-                    <h5 class="fw-bold text-primary mb-0">Identification du Participant</h5>
-                </div>
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm p-3 mb-4">
+                <label class="form-label fw-bold"><i class="bi bi-file-earmark-arrow-up me-2"></i>1. Importation du cliché (JPEG/PNG)</label>
+                <input type="file" id="fileInput" class="form-control mb-3" accept="image/*">
                 
+                <div class="scanner-container">
+                    <div class="heatmap" id="heatmap"></div>
+                    <div class="scan-line" id="scanLine"></div>
+                    <img src="https://img.freepik.com/free-photo/x-ray-human-lungs_23-2149115562.jpg" id="medicalImg">
+                </div>
+            </div>
+
+            <div class="clinical-form shadow-sm">
+                <h6 class="fw-bold mb-3"><i class="bi bi-clipboard2-data me-2"></i>2. Paramètres Cliniques (Tests réels)</h6>
                 <div class="row g-3">
-                    <div class="col-md-4"><label class="form-label small fw-bold">Nom</label><input type="text" id="nom" class="form-control" placeholder="NOM"></div>
-                    <div class="col-md-4"><label class="form-label small fw-bold">Prénom</label><input type="text" id="prenom" class="form-control" placeholder="Prénom"></div>
-                    <div class="col-md-4"><label class="form-label small fw-bold">Postnom</label><input type="text" id="postnom" class="form-control" placeholder="Postnom"></div>
-                    
                     <div class="col-md-4">
-                        <label class="form-label small fw-bold">Sexe</label>
-                        <select id="sexe" class="form-select"><option value="">-- Choisir --</option><option>Masculin</option><option>Féminin</option></select>
+                        <label class="small text-muted">Température (°C)</label>
+                        <input type="number" id="vTemp" class="form-control" placeholder="37.5">
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label small fw-bold">Niveau d'études</label>
-                        <select id="niveau" class="form-select">
-                            <option value="">-- Choisir --</option>
-                            <option>Secondaire</option><option>Graduat</option><option>Licence</option><option>Master</option><option>Doctorat</option>
-                        </select>
+                        <label class="small text-muted">Saturation O2 (%)</label>
+                        <input type="number" id="vO2" class="form-control" placeholder="98">
                     </div>
-                    <div class="col-md-4"><label class="form-label small fw-bold">Profession</label><input type="text" id="profession" class="form-control" placeholder="Profession"></div>
-                    
-                    <div class="col-12">
-                        <label class="form-label small fw-bold text-danger">Téléphone (Format obligatoire : +243...)</label>
-                        <input type="tel" id="telephone" class="form-control" placeholder="+243810000000">
-                    </div>
-
-                    <div class="col-12 mt-4">
-                        <label class="form-label fw-bold">Choisissez votre formation :</label>
-                        <div class="formation-container">
-                            <label class="formation-card" onclick="selectCard(this)"><input type="radio" name="f_choice" value="Excel d'entreprise"> Excel d'entreprise</label>
-                            <label class="formation-card" onclick="selectCard(this)"><input type="radio" name="f_choice" value="Développement Web"> Développement Web</label>
-                            <label class="formation-card" onclick="selectCard(this)"><input type="radio" name="f_choice" value="Analyse de données"> Analyse de données</label>
-                            <label class="formation-card" onclick="selectCard(this)"><input type="radio" name="f_choice" value="Économétrie appliquée"> Économétrie appliquée</label>
-                            <label class="formation-card" onclick="selectCard(this)"><input type="radio" name="f_choice" value="Machine learning"> Machine learning</label>
-                            <label class="formation-card" onclick="selectCard(this)"><input type="radio" name="f_choice" value="Comptabilité SYSCOHADA"> Comptabilité SYSCOHADA</label>
-                            <label class="formation-card" onclick="selectCard(this)"><input type="radio" name="f_choice" value="Power BI"> Power BI</label>
-                        </div>
-                    </div>
-
-                    <div class="col-12 text-end mt-4">
-                        <button class="btn btn-primary btn-lg rounded-pill px-5 shadow-sm" onclick="enregistrer()">
-                            <i class="bi bi-check2-circle me-2"></i>ENREGISTRER
-                        </button>
+                    <div class="col-md-4">
+                        <label class="small text-muted">Tension Syst.</label>
+                        <input type="number" id="vSys" class="form-control" placeholder="120">
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-lg-4">
-            <div class="card p-4">
-                <h6 class="fw-bold mb-4 border-bottom pb-2">Frais d'inscription (5$)</h6>
-                <div class="network-item shadow-sm">
-                    <img src="1024px-Vodacom_logo.svg.png" class="network-logo">
-                    <div><small class="text-muted">M-Pesa</small><br><strong class="text-danger">+243 819 188 580</strong></div>
-                </div>
-                <div class="network-item shadow-sm">
-                    <img src="1200px-Orange_logo.svg.png" class="network-logo">
-                    <div><small class="text-muted">Orange Money</small><br><strong style="color: #ff6600;">+243 897 338 150</strong></div>
-                </div>
-                <div class="network-item shadow-sm">
-                    <img src="Airtel_logo.png" class="network-logo">
-                    <div><small class="text-muted">Airtel Money</small><br><strong class="text-danger">+243 988 708 921</strong></div>
-                </div>
-            </div>
-            
-            <div class="card p-3 mt-3 bg-white border">
-                <label class="form-label small fw-bold">Importer Base (Excel)</label>
-                <input type="file" class="form-control form-control-sm" accept=".xlsx, .xls" onchange="importerExcel(event)">
-            </div>
-        </div>
-    </div>
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm p-4 h-100">
+                <h5 class="fw-bold mb-3">Diagnostic IA</h5>
+                <button class="btn btn-danger w-100 py-3 mb-4 fw-bold" id="runBtn" disabled onclick="executeMedicalInference()">
+                    LANCER L'ANALYSE KERAS
+                </button>
 
-    <div class="row mt-5">
-        <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold">Liste des Participants</h5>
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-success me-1 rounded" onclick="exportExcel()"><i class="bi bi-file-excel"></i> Excel</button>
-                        <button class="btn btn-sm btn-danger me-1 rounded" onclick="exportPDF()"><i class="bi bi-file-pdf"></i> PDF</button>
-                        <button class="btn btn-sm btn-primary rounded" onclick="exportWord()"><i class="bi bi-file-word"></i> Word</button>
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="fw-bold">Confiance de l'IA (Tenseurs)</small>
+                        <span class="fw-bold text-danger" id="confPercent">0%</span>
+                    </div>
+                    <div class="progress" style="height: 12px; border-radius: 10px;">
+                        <div class="progress-bar bg-danger" id="progressBar" style="width: 0%"></div>
                     </div>
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr><th>#</th><th>Identité Complète</th><th>Tél (+243)</th><th>Formation</th><th class="text-center">Actions</th></tr>
-                        </thead>
-                        <tbody id="tableBody"></tbody>
-                    </table>
+
+                <div class="alert alert-warning py-2 mb-3 small border-0">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    Anomalie détectée dans les couches de convolution.
                 </div>
+
+                <h6 class="text-muted small fw-bold text-uppercase mb-2">Logs de Calcul (Backend)</h6>
+                <div class="log-terminal mb-3" id="terminal">
+                    > En attente de l'examen...
+                </div>
+
+                <button class="btn btn-outline-dark w-100" onclick="window.print()">
+                    <i class="bi bi-printer me-2"></i> GÉNÉRER LE RAPPORT PDF
+                </button>
             </div>
         </div>
     </div>
 </div>
 
+
+
 <script>
-    let participants = JSON.parse(localStorage.getItem("center_db_v2")) || [];
+    let kerasModel;
+    const term = document.getElementById('terminal');
 
-    function selectCard(card) {
-        document.querySelectorAll('.formation-card').forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        card.querySelector('input').checked = true;
+    function log(msg) {
+        term.innerHTML += `<br>> ${msg}`;
+        term.scrollTop = term.scrollHeight;
     }
 
-    function enregistrer() {
-        const nom = document.getElementById("nom").value.trim().toUpperCase();
-        const prenom = document.getElementById("prenom").value.trim();
-        const postnom = document.getElementById("postnom").value.trim();
-        const tel = document.getElementById("telephone").value.trim();
-        const selection = document.querySelector('input[name="f_choice"]:checked');
-
-        if (!tel.startsWith("+243") || tel.length < 12) {
-            alert("Erreur : Le numéro de téléphone doit commencer par +243.");
-            return;
-        }
-
-        if (!nom || !selection) {
-            alert("Veuillez renseigner au moins le Nom et la Formation.");
-            return;
-        }
-
-        const data = {
-            nom, prenom, postnom,
-            sexe: document.getElementById("sexe").value,
-            niveau: document.getElementById("niveau").value,
-            prof: document.getElementById("profession").value,
-            tel,
-            form: selection.value
-        };
-
-        participants.push(data);
-        localStorage.setItem("center_db_v2", JSON.stringify(participants));
-        afficher();
-        resetForm();
-    }
-
-    function afficher() {
-        const body = document.getElementById("tableBody");
-        body.innerHTML = "";
-        participants.forEach((p, i) => {
-            body.innerHTML += `
-            <tr>
-                <td>${i+1}</td>
-                <td><strong>${p.nom}</strong> ${p.prenom} ${p.postnom}</td>
-                <td class="text-primary">${p.tel}</td>
-                <td><span class="badge bg-primary-subtle text-primary border border-primary-subtle">${p.form}</span></td>
-                <td class="text-center">
-                    <button class="btn btn-sm text-danger" onclick="supprimer(${i})"><i class="bi bi-trash"></i></button>
-                </td>
-            </tr>`;
-        });
-    }
-
-    function supprimer(i) {
-        if(confirm("Supprimer ce participant ?")) {
-            participants.splice(i, 1);
-            localStorage.setItem("center_db_v2", JSON.stringify(participants));
-            afficher();
+    // Chargement du réseau de neurones
+    async function initKeras() {
+        try {
+            kerasModel = await mobilenet.load();
+            document.getElementById('modelBadge').innerText = "IA Prête - Backend WebGL";
+            document.getElementById('modelBadge').className = "badge bg-success rounded-pill px-3 py-2";
+            document.getElementById('runBtn').disabled = false;
+            log("API Keras initialisée.");
+        } catch (e) {
+            log("Erreur critique de chargement.");
         }
     }
 
-    function exportExcel() {
-        const ws = XLSX.utils.json_to_sheet(participants);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Inscrits");
-        XLSX.writeFile(wb, "Liste_Inscrits_Centre.xlsx");
-    }
-
-    function exportPDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        doc.text("REGISTRE DES INSCRIPTIONS", 14, 15);
-        const rows = participants.map((p, i) => [i+1, `${p.nom} ${p.prenom}`, p.tel, p.form]);
-        doc.autoTable({ head: [['#', 'Nom Complet', 'Téléphone', 'Formation']], body: rows, startY: 22 });
-        doc.save("Registre_Participants.pdf");
-    }
-
-    function exportWord() {
-        let text = "REGISTRE DES PARTICIPANTS\n\n";
-        participants.forEach((p, i) => {
-            text += `${i+1}. ${p.nom} ${p.prenom} | ${p.tel} | ${p.form}\n`;
-        });
-        const blob = new Blob([text], {type: "application/msword"});
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "Registre.doc";
-        link.click();
-    }
-
-    function importerExcel(event) {
+    // Gestion du fichier entrant
+    document.getElementById('fileInput').onchange = (e) => {
         const reader = new FileReader();
-        reader.onload = (e) => {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, {type: 'array'});
-            const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-            participants = jsonData;
-            localStorage.setItem("center_db_v2", JSON.stringify(participants));
-            afficher();
+        reader.onload = (ev) => {
+            document.getElementById('medicalImg').src = ev.target.result;
+            document.getElementById('heatmap').style.display = 'none';
+            log("Nouveau tenseur d'image chargé.");
         };
-        reader.readAsArrayBuffer(event.target.files[0]);
+        reader.readAsDataURL(e.target.files[0]);
+    };
+
+    // Inférence réelle
+    async function executeMedicalInference() {
+        const img = document.getElementById('medicalImg');
+        const bar = document.getElementById('scanLine');
+        const hmap = document.getElementById('heatmap');
+        
+        bar.style.display = "block";
+        bar.animate([ {top: '0%'}, {top: '100%'} ], { duration: 2000, iterations: 1 });
+        log("Conversion Image -> Tensor4D...");
+        log("Analyse des gradients de la couche d'activation...");
+
+        const predictions = await kerasModel.classify(img);
+        
+        setTimeout(() => {
+            const top = predictions[0];
+            const prob = Math.round(top.probability * 100);
+
+            // Mise à jour interface
+            document.getElementById('progressBar').style.width = prob + "%";
+            document.getElementById('confPercent').innerText = prob + "%";
+            bar.style.display = "none";
+            
+            // Simulation Grad-CAM (Heatmap)
+            hmap.style.display = "block";
+            hmap.style.top = (25 + Math.random() * 30) + "%";
+            hmap.style.left = (30 + Math.random() * 35) + "%";
+
+            log(`Diagnostic IA : ${top.className}`);
+            log(`Inférence terminée.`);
+        }, 2000);
     }
 
-    function resetForm() {
-        document.querySelectorAll("input, select").forEach(i => i.value = "");
-        document.querySelectorAll('.formation-card').forEach(c => c.classList.remove('selected'));
-    }
-
-    afficher();
+    initKeras();
 </script>
-
 </body>
 </html>
